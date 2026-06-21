@@ -10,12 +10,12 @@ app.use(express.json());
 
 app.get("/energy-mix", async (req, res) => {
   try {
-    const today = new Date().setHours(0, 0, 0, 0);
-    today.toISOString();
-    const dateStart = today.toISOString();
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const dateStart = today.toISOString().substring(0, 16) + "Z";
     const end = new Date(today);
-    end.setDate(end.getDate() + 3);
-    const dateEnd = end.toISOString();
+    end.setUTCDate(end.getUTCDate() + 3);
+    const dateEnd = end.toISOString().substring(0, 16) + "Z";
 
     const response = await axios.get(
       `https://api.carbonintensity.org.uk/generation/${dateStart}/${dateEnd}`,
@@ -60,8 +60,12 @@ app.get("/energy-mix", async (req, res) => {
     });
     res.json(results);
   } catch (error) {
-    console.error("Błąd podczas pobierania danych:", error);
-    res.status(500).json({ error: "Wystąpił błąd podczas pobierania danych." });
+    const apiError = error.response ? error.response.data : error.message;
+    console.error("Błąd podczas pobierania danych:", apiError);
+    res.status(500).json({
+      error: "Wystąpił błąd podczas pobierania danych.",
+      details: apiError,
+    });
   }
 });
 
