@@ -69,6 +69,79 @@ app.get("/energy-mix", async (req, res) => {
   }
 });
 
+app.get("/optimal-window/:hours", async (req, res) => {
+  try {
+    const hours = parseInt(req.params.hours);
+
+    if (hours >= 1 && hours <= 6) {
+      const requiredIntervals = hours * 2;
+
+      const start = new Date();
+      start.setUTCHours(0, 0, 0, 0);
+      start.setUTCDate(start.getUTCDate() + 1);
+      const dateStart = start.toISOString().substring(0, 16) + "Z";
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 2);
+      const dateEnd = end.toISOString().substring(0, 16) + "Z";
+
+      const response = await axios.get(
+        `https://api.carbonintensity.org.uk/generation/${dateStart}/${dateEnd}`,
+      );
+
+      const cleanEnergySources = [
+        "biomass",
+        "nuclear",
+        "hydro",
+        "wind",
+        "solar",
+      ];
+      const intervals = response.data.data.map((interval) => {
+        let cleanEnergyPercentage = 0;
+        interval.generationmix.forEach((source) => {
+          if (cleanEnergySources.includes(source.fuel)) {
+            cleanEnergyPercentage += source.perc;
+          }
+        });
+        return {
+          from: interval.from,
+          to: interval.to,
+          cleanEnergyPercentage: cleanEnergyPercentage,
+        };
+      });
+
+      let maxAverage = 0;
+      let optimalStart = null;
+      for (let i = 0; i <= intervals.length - requiredIntervals; i++) {
+        let currentSum = 0;
+        for (let j = 0; j < requiredIntervals; j++) {
+          currentSum += intervals[i + j].cleanEnergyPercentage;
+        }
+        const currentAverage = currentSum / requiredIntervals;
+        if (currentAverage > maxAverage) {
+          maxAverage = currentAverage;
+          optimalStart = {
+            from: intervals[i].from,
+            to: intervals[i + requiredIntervals - 1].to,
+            averageCleanEnergy: maxAverage,
+          };
+        }
+      }
+      res.json(optimalStart);
+    } else {
+      res.status(400).json({
+        error: "Nieprawidłowa liczba godzin. Proszę podać wartość od 1 do 6.",
+      });
+    }
+  } catch (error) {
+    const apiError = error.response ? error.response.data : error.message;
+    console.error("Błąd podczas pobierania danych:", apiError);
+    res.status(500).json({
+      error: "Wystąpił błąd podczas pobierania danych.",
+      details: apiError,
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Serwer działa na porcie ${PORT}`);
 });
