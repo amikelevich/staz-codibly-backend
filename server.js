@@ -23,7 +23,10 @@ app.get("/energy-mix", async (req, res) => {
 
     const cleanEnergySources = ["biomass", "nuclear", "hydro", "wind", "solar"];
     const groupedByDate = {};
-    response.data.data.forEach((interval) => {
+    const validIntervals = response.data.data.filter(
+      (interval) => interval.from >= dateStart,
+    );
+    validIntervals.forEach((interval) => {
       const date = interval.from.split("T")[0];
       if (!groupedByDate[date]) {
         groupedByDate[date] = {
